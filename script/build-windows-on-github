@@ -7,7 +7,7 @@
 
 set -euo pipefail
 
-workflow="build-windows.yml"
+workflow_name="Build Windows"
 trigger_branch="build-windows"
 output_dir="dist/windows"
 
@@ -21,6 +21,8 @@ if [[ -n "$(git status --porcelain)" ]]; then
     exit 1
 fi
 
+# gh would otherwise default to the upstream zed-industries/zed repository.
+repository="$(git remote get-url origin | sed -E 's#^(https://github\.com/|git@github\.com:)##; s#\.git$##')"
 commit="$(git rev-parse HEAD)"
 echo "Pushing ${commit:0:7} to origin/${trigger_branch}..."
 git push --force origin "HEAD:refs/heads/${trigger_branch}"
@@ -28,9 +30,10 @@ git push --force origin "HEAD:refs/heads/${trigger_branch}"
 echo "Waiting for the GitHub Actions run to start..."
 run_id=""
 for _ in $(seq 1 60); do
-    run_id="$(gh run list --workflow "$workflow" --branch "$trigger_branch" --limit 20 \
-        --json databaseId,headSha \
-        --jq "map(select(.headSha == \"$commit\")) | first | .databaseId // empty")"
+    # Filter by name rather than --workflow, which only resolves workflows on the default branch.
+    run_id="$(gh run list --repo "$repository" --branch "$trigger_branch" --limit 20 \
+        --json databaseId,headSha,workflowName \
+        --jq "map(select(.headSha == \"$commit\" and .workflowName == \"$workflow_name\")) | first | .databaseId // empty")"
     if [[ -n "$run_id" ]]; then
         break
     fi
@@ -43,9 +46,9 @@ if [[ -z "$run_id" ]]; then
 fi
 
 echo "Watching run $run_id (this can take a couple of hours)..."
-gh run watch "$run_id" --exit-status --interval 60
+gh run watch --repo "$repository" "$run_id" --exit-status --interval 60
 
 rm -rf "$output_dir"
-gh run download "$run_id" --dir "$output_dir"
+gh run download --repo "$repository" "$run_id" --dir "$output_dir"
 echo "Windows installer downloaded to:"
 find "$output_dir" -type f -name '*.exe'
