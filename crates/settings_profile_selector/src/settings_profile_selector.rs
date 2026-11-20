@@ -634,7 +634,7 @@ mod tests {
     #[gpui::test]
     async fn test_settings_profile_with_default_base(cx: &mut TestAppContext) {
         let user_settings_json = json!({
-            "buffer_font_size": 10.0,
+            "buffer_font_size": 12.0,
             "profiles": {
                 "Clean Slate": {
                     "base": "default"
@@ -649,13 +649,13 @@ mod tests {
         });
         let (workspace, cx) = init_test(user_settings_json, cx).await;
 
-        // User has buffer_font_size: 10, factory default is 15.
+        // User has buffer_font_size: 12, factory default is 10.
         cx.update(|_, cx| {
-            assert_eq!(ThemeSettings::get_global(cx).buffer_font_size(cx), px(10.0));
+            assert_eq!(ThemeSettings::get_global(cx).buffer_font_size(cx), px(12.0));
         });
 
         // "Clean Slate" has base: "default" with no settings overrides,
-        // so we get the factory default (15), not the user's value (10).
+        // so we get the factory default (10), not the user's value (12).
         cx.dispatch_action(settings_profile_selector::Toggle);
         let picker = active_settings_profile_picker(&workspace, cx);
         cx.dispatch_action(SelectNext);
@@ -665,12 +665,12 @@ mod tests {
                 picker.delegate.selected_profile_name.as_deref(),
                 Some("Clean Slate")
             );
-            assert_eq!(ThemeSettings::get_global(cx).buffer_font_size(cx), px(15.0));
+            assert_eq!(ThemeSettings::get_global(cx).buffer_font_size(cx), px(10.0));
         });
 
         // "Custom on Defaults" has base: "default" with buffer_font_size: 30,
         // so the profile's override (30) applies on top of the factory default,
-        // not on top of the user's value (10).
+        // not on top of the user's value (12).
         cx.dispatch_action(SelectNext);
 
         picker.read_with(cx, |picker, cx| {

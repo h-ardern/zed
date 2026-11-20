@@ -48,6 +48,7 @@
     "bindings": {
       "f5": "debugger::Start", // Start Debugging
       "ctrl-alt-i": "agent::ToggleFocus", // Open Chat
+      "ctrl-k ctrl-\\": "pane::SplitDown", // Split Editor Down
     },
   },
   {

@@ -520,7 +520,7 @@ pub struct ExtensionsSettingsContent {
 
 /// Base key bindings scheme. Base keymaps can be overridden with user keymaps.
 ///
-/// Default: Zed
+/// Default: VSCode
 #[derive(
     Copy,
     Clone,
@@ -535,8 +535,8 @@ pub struct ExtensionsSettingsContent {
     strum::VariantArray,
 )]
 pub enum BaseKeymapContent {
-    #[default]
     Zed,
+    #[default]
     VSCode,
     JetBrains,
     SublimeText,

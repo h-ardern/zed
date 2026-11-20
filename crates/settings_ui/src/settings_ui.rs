@@ -3043,8 +3043,9 @@ impl SettingsWindow {
             .pl_1p5()
             .pr_0p5()
             .h_7()
-            .mb_3()
             .gap_1p5()
+            .flex_1()
+            .min_w_0()
             .rounded_sm()
             .bg(cx.theme().colors().editor_background)
             .border_1()
@@ -3218,7 +3219,6 @@ impl SettingsWindow {
             .border_r_1()
             .border_color(cx.theme().colors().border)
             .bg(cx.theme().colors().panel_background)
-            .child(self.render_search(window, cx))
             .child(
                 v_flex()
                     .id("settings-ui-nav")
@@ -4724,7 +4724,7 @@ impl Render for SettingsWindow {
                             window.focus_prev(cx);
                         })
                         .flex()
-                        .flex_row()
+                        .flex_col()
                         .flex_1()
                         .min_h_0()
                         .font(ui_font)
@@ -4733,8 +4733,34 @@ impl Render for SettingsWindow {
                         .when(!cfg!(target_os = "macos"), |this| {
                             this.border_t_1().border_color(cx.theme().colors().border)
                         })
-                        .child(self.render_nav(window, cx))
-                        .child(self.render_page(window, cx)),
+                        .child(
+                            h_flex()
+                                .w_full()
+                                .flex_none()
+                                .px_3()
+                                .py_2()
+                                .gap_2()
+                                .items_center()
+                                .border_b_1()
+                                .border_color(cx.theme().colors().border)
+                                .child(self.render_search(window, cx))
+                                .child(
+                                    Button::new("open-settings-json", "Open Settings (JSON)")
+                                        .on_click(cx.listener(|this, _, window, cx| {
+                                            this.open_current_settings_file(window, cx);
+                                        })),
+                                ),
+                        )
+                        .child(
+                            div()
+                                .flex()
+                                .flex_row()
+                                .flex_1()
+                                .min_h_0()
+                                .w_full()
+                                .child(self.render_nav(window, cx))
+                                .child(self.render_page(window, cx)),
+                        ),
                 ),
             window,
             cx,

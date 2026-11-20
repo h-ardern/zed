@@ -7,13 +7,13 @@ use settings::{RegisterSetting, Settings};
 
 /// Base key bindings scheme. Base keymaps can be overridden with user keymaps.
 ///
-/// Default: Zed
+/// Default: VSCode
 #[derive(
     Copy, Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq, Eq, Default, RegisterSetting,
 )]
 pub enum BaseKeymap {
-    #[default]
     Zed,
+    #[default]
     VSCode,
     JetBrains,
     SublimeText,
@@ -74,8 +74,8 @@ impl Display for BaseKeymap {
 impl BaseKeymap {
     #[cfg(target_os = "macos")]
     pub const OPTIONS: [(&'static str, Self); 8] = [
-        ("Zed (Default)", Self::Zed),
-        ("VS Code", Self::VSCode),
+        ("VS Code (Default)", Self::VSCode),
+        ("Zed", Self::Zed),
         ("Atom", Self::Atom),
         ("JetBrains", Self::JetBrains),
         ("Sublime Text", Self::SublimeText),
@@ -86,8 +86,8 @@ impl BaseKeymap {
 
     #[cfg(not(target_os = "macos"))]
     pub const OPTIONS: [(&'static str, Self); 7] = [
-        ("Zed (Default)", Self::Zed),
-        ("VS Code", Self::VSCode),
+        ("VS Code (Default)", Self::VSCode),
+        ("Zed", Self::Zed),
         ("Atom", Self::Atom),
         ("JetBrains", Self::JetBrains),
         ("Sublime Text", Self::SublimeText),

@@ -454,7 +454,7 @@ pub struct StickyScrollContent {
 pub struct MinimapContent {
     /// When to show the minimap in the editor.
     ///
-    /// Default: never
+    /// Default: always
     pub show: Option<ShowMinimap>,
 
     /// Where to show the minimap in the editor.
@@ -1074,9 +1074,9 @@ pub enum ShowMinimap {
     /// Follow the visibility of the scrollbar.
     Auto,
     /// Always show the minimap.
+    #[default]
     Always,
     /// Never show the minimap.
-    #[default]
     Never,
 }
 

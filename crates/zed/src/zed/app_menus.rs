@@ -292,6 +292,14 @@ pub fn app_menus(cx: &mut App) -> Vec<Menu> {
             ],
         },
         Menu {
+            name: "Terminal".into(),
+            disabled: false,
+            items: vec![
+                MenuItem::action("New Terminal", workspace::NewTerminal::default()),
+                MenuItem::action("Toggle Terminal", terminal_panel::Toggle),
+            ],
+        },
+        Menu {
             name: "Window".into(),
             disabled: false,
             items: vec![

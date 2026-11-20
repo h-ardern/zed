@@ -565,6 +565,13 @@ impl Dock {
         self.active_panel_index
     }
 
+    pub fn panels(&self) -> impl Iterator<Item = (usize, &Arc<dyn PanelHandle>)> + '_ {
+        self.panel_entries
+            .iter()
+            .enumerate()
+            .map(|(index, entry)| (index, &entry.panel))
+    }
+
     pub fn set_open(&mut self, open: bool, window: &mut Window, cx: &mut Context<Self>) {
         if open != self.is_open {
             self.restoration.discard_pending();
