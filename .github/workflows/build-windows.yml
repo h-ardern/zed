@@ -1,0 +1,35 @@
+name: Build Windows
+
+on:
+  push:
+    branches:
+      - build-windows
+  workflow_dispatch:
+
+concurrency:
+  group: build-windows
+  cancel-in-progress: true
+
+jobs:
+  bundle_windows_x86_64:
+    runs-on: windows-2022
+    timeout-minutes: 360
+    env:
+      CARGO_INCREMENTAL: 0
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+
+      - name: Bundle Windows installer
+        run: script/bundle-windows.ps1 -Architecture x86_64
+        shell: pwsh
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: Zed-windows-x86_64
+          path: target/Zed-x86_64.exe
+          if-no-files-found: error

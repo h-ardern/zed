@@ -1,6 +1,7 @@
 **/*.db
 .sysroot/
 .zed-user-data/
+/dist/
 **/*.proptest-regressions
 **/cargo-target
 **/target

@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+
+# Windows builds can't be done from Linux: gpui_windows compiles its shaders
+# with fxc.exe only when the build host is Windows. So we push HEAD to a
+# dedicated branch that triggers .github/workflows/build-windows.yml on a
+# GitHub-hosted Windows runner, then download the resulting installer.
+
+set -euo pipefail
+
+workflow="build-windows.yml"
+trigger_branch="build-windows"
+output_dir="dist/windows"
+
+if ! command -v gh >/dev/null 2>&1; then
+    echo "The GitHub CLI (gh) is required: https://cli.github.com" >&2
+    exit 1
+fi
+
+if [[ -n "$(git status --porcelain)" ]]; then
+    echo "You have uncommitted changes. Commit them first: the Windows build uses what is pushed." >&2
+    exit 1
+fi
+
+commit="$(git rev-parse HEAD)"
+echo "Pushing ${commit:0:7} to origin/${trigger_branch}..."
+git push --force origin "HEAD:refs/heads/${trigger_branch}"
+
+echo "Waiting for the GitHub Actions run to start..."
+run_id=""
+for _ in $(seq 1 60); do
+    run_id="$(gh run list --workflow "$workflow" --branch "$trigger_branch" --limit 20 \
+        --json databaseId,headSha \
+        --jq "map(select(.headSha == \"$commit\")) | first | .databaseId // empty")"
+    if [[ -n "$run_id" ]]; then
+        break
+    fi
+    sleep 5
+done
+
+if [[ -z "$run_id" ]]; then
+    echo "No workflow run appeared for ${commit:0:7}. Check the Actions tab of your fork." >&2
+    exit 1
+fi
+
+echo "Watching run $run_id (this can take a couple of hours)..."
+gh run watch "$run_id" --exit-status --interval 60
+
+rm -rf "$output_dir"
+gh run download "$run_id" --dir "$output_dir"
+echo "Windows installer downloaded to:"
+find "$output_dir" -type f -name '*.exe'
