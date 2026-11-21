@@ -4520,7 +4520,7 @@ async fn test_agent_connection(cx: &mut TestAppContext) {
         let client = Client::new(clock, http_client, cx);
         let user_store = cx.new(|cx| UserStore::new(client.clone(), cx));
         language_model::init(cx);
-        RefreshLlmTokenListener::register(client.clone(), user_store.clone(), cx);
+        RefreshLlmTokenListener::register(client.clone(), user_store, cx);
         language_models::init(client.clone(), cx);
     });
     let fake = cx.update(LanguageModelRegistry::test);
@@ -5303,7 +5303,7 @@ async fn setup(cx: &mut TestAppContext, model: TestModel) -> ThreadTest {
                 let client = Client::production(cx);
                 let user_store = cx.new(|cx| UserStore::new(client.clone(), cx));
                 language_model::init(cx);
-                RefreshLlmTokenListener::register(client.clone(), user_store.clone(), cx);
+                RefreshLlmTokenListener::register(client.clone(), user_store, cx);
                 language_models::init(client.clone(), cx);
                 Arc::new(FakeLanguageModelProvider::default())
             }

@@ -16649,6 +16649,8 @@ mod tests {
             let center_column_count = workspace.center.full_height_column_count();
             assert_eq!(center_column_count, 2);
 
+            // Re-rendering measures the workspace without the activity bar, so pin the width again.
+            workspace.bounds.size.width = px(1920.);
             let dock = workspace.right_dock().read(cx);
             assert_eq!(workspace.dock_size(&dock, window, cx).unwrap(), px(640.));
 

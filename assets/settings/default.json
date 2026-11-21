@@ -1071,7 +1071,7 @@
     // Whether to show the collaboration panel button in the status bar.
     "button": true,
     // Where to dock the collaboration panel. Can be 'left' or 'right'.
-    "dock": "right",
+    "dock": "left",
     // Default width of the collaboration panel.
     "default_width": 240,
   },

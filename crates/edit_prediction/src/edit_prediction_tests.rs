@@ -2908,6 +2908,7 @@ fn init_test_with_fake_client_and_legacy_data_collection(
         let settings_store = SettingsStore::test(cx);
         cx.set_global(settings_store);
         disable_jumps_feature_flag(cx);
+        use_zed_edit_prediction_provider(cx);
         zlog::init_test();
 
         if let Some(legacy_data_collection_choice) = legacy_data_collection_choice {
@@ -3472,6 +3473,7 @@ fn init_test(cx: &mut TestAppContext) {
         let settings_store = SettingsStore::test(cx);
         cx.set_global(settings_store);
         disable_jumps_feature_flag(cx);
+        use_zed_edit_prediction_provider(cx);
     });
 }
 
@@ -3481,6 +3483,20 @@ fn disable_jumps_feature_flag(cx: &mut App) {
     });
     set_jumps_feature_flag_override(cx, "off");
     cx.update_flags(false, vec![]);
+}
+
+// The app default provider is "none", which skips prediction requests entirely.
+fn use_zed_edit_prediction_provider(cx: &mut App) {
+    SettingsStore::update_global(cx, |store, cx| {
+        store.update_user_settings(cx, |content| {
+            content
+                .project
+                .all_languages
+                .edit_predictions
+                .get_or_insert_default()
+                .provider = Some(settings::EditPredictionProvider::Zed);
+        });
+    });
 }
 
 fn set_jumps_feature_flag_override(cx: &mut App, value: &str) {

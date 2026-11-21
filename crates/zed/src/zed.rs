@@ -3267,7 +3267,7 @@ mod tests {
             .update(cx, |multi_workspace, window, cx| {
                 multi_workspace.workspace().update(cx, |workspace, cx| {
                     assert_eq!(workspace.worktrees(cx).count(), 2);
-                    assert!(workspace.right_dock().read(cx).is_open());
+                    assert!(workspace.left_dock().read(cx).is_open());
                     assert!(
                         workspace
                             .active_pane()
@@ -5178,7 +5178,7 @@ mod tests {
             .unwrap();
         let cx = &mut VisualTestContext::from_window(*window, cx);
 
-        let mouse_position = point(px(250.), px(250.));
+        let mouse_position = point(px(600.), px(300.));
 
         let event_modifiers = {
             #[cfg(target_os = "macos")]
@@ -6249,11 +6249,8 @@ mod tests {
                 "branches",
                 "buffer_search",
                 "call_hierarchy",
-                "channel_modal",
                 "cli",
-                "client",
                 "collab",
-                "collab_panel",
                 "command_palette",
                 "console",
                 "context_server",

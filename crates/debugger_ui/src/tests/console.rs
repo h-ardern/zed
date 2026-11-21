@@ -5,7 +5,7 @@ use crate::{
 };
 use dap::requests::StackTrace;
 use editor::{DisplayPoint, display_map::DisplayRow};
-use gpui::{BackgroundExecutor, TestAppContext, VisualTestContext};
+use gpui::{BackgroundExecutor, TestAppContext, UpdateGlobal as _, VisualTestContext};
 use project::{FakeFs, Project};
 use serde_json::json;
 use tests::{init_test, init_test_workspace};
@@ -162,6 +162,15 @@ async fn test_handle_output_event(executor: BackgroundExecutor, cx: &mut TestApp
 #[gpui::test]
 async fn test_escape_code_processing(executor: BackgroundExecutor, cx: &mut TestAppContext) {
     init_test(cx);
+    // The expected highlight positions assume the console is wide enough not to wrap.
+    cx.update(|cx| {
+        settings::SettingsStore::update_global(cx, |store, cx| {
+            store.update_user_settings(cx, |settings| {
+                settings.debugger.get_or_insert_default().dock =
+                    Some(settings::DockPosition::Bottom);
+            });
+        });
+    });
 
     let fs = FakeFs::new(executor.clone());
 
