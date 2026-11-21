@@ -582,7 +582,6 @@ pub fn initialize_workspace(app_state: Arc<AppState>, cx: &mut App) {
         let edit_prediction_ui = cx.new(|cx| {
             edit_prediction_ui::EditPredictionButton::new(
                 app_state.fs.clone(),
-                app_state.user_store.clone(),
                 edit_prediction_menu_handle.clone(),
                 workspace.project().clone(),
                 cx,
@@ -3195,6 +3194,44 @@ mod tests {
                 assert_eq!(
                     multi_workspace.workspace().read(cx).open_item_abs_paths(cx),
                     vec![PathBuf::from(path!("/root/file.txt"))]
+                );
+            })
+            .unwrap();
+    }
+
+    #[gpui::test]
+    async fn test_workspace_windows_have_title_bar(cx: &mut TestAppContext) {
+        let app_state = init_test(cx);
+        app_state
+            .fs
+            .as_fake()
+            .insert_tree(path!("/root"), json!({ "a.txt": "" }))
+            .await;
+
+        cx.update(|cx| {
+            open_paths(
+                &[PathBuf::from(path!("/root"))],
+                app_state.clone(),
+                workspace::OpenOptions::default(),
+                cx,
+            )
+        })
+        .await
+        .unwrap();
+        cx.run_until_parked();
+
+        let multi_workspace = cx
+            .read(|cx| cx.windows()[0].downcast::<MultiWorkspace>())
+            .unwrap();
+        multi_workspace
+            .update(cx, |multi_workspace, _window, cx| {
+                assert!(
+                    multi_workspace
+                        .workspace()
+                        .read(cx)
+                        .titlebar_item()
+                        .is_some(),
+                    "title_bar::init must run so workspaces get a title bar"
                 );
             })
             .unwrap();
@@ -6327,7 +6364,6 @@ mod tests {
                 "worktree_picker",
                 "zed",
                 "zed_actions",
-                "zed_predict_onboarding",
                 "zeta",
             ];
             assert_eq!(
@@ -6514,6 +6550,7 @@ mod tests {
             release_channel::init(Version::new(0, 0, 0), cx);
             command_palette::init(cx);
             editor::init(cx);
+            title_bar::init(cx);
             git_ui::init(cx);
             project_panel::init(cx);
             outline_panel::init(cx);
