@@ -301,7 +301,6 @@ mod tests {
     async fn test_sweep_prompt_format_routes_to_sweep_prompt_model(cx: &mut TestAppContext) {
         let app_state = cx.update(|cx| {
             let app_state = AppState::test(cx);
-            client::init(&app_state.client, cx);
             language_model::init(cx);
             app_state
         });
@@ -349,7 +348,6 @@ mod tests {
     async fn test_ollama_provider_routes_to_fim_model(cx: &mut TestAppContext) {
         let app_state = cx.update(|cx| {
             let app_state = AppState::test(cx);
-            client::init(&app_state.client, cx);
             language_model::init(cx);
             app_state
         });
@@ -397,7 +395,6 @@ mod tests {
     ) {
         let app_state = cx.update(|cx| {
             let app_state = AppState::test(cx);
-            client::init(&app_state.client, cx);
             language_model::init(cx);
             client::RefreshLlmTokenListener::register(
                 app_state.client.clone(),
