@@ -1,90 +1,65 @@
 use std::sync::Arc;
 
-use client::{Client, UserStore};
-use cloud_api_types::Plan;
-use gpui::{Entity, IntoElement, ParentElement};
-use language_model::{LanguageModelRegistry, ZED_CLOUD_PROVIDER_ID};
-use ui::prelude::*;
+use gpui::{IntoElement, ParentElement};
+use language_model::LanguageModelRegistry;
+use ui::{Tooltip, prelude::*};
 
-use crate::{AgentPanelOnboardingCard, ApiKeysWithoutProviders, ZedAiOnboarding};
+use crate::{AgentPanelOnboardingCard, ApiKeysWithoutProviders};
 
 pub struct AgentPanelOnboarding {
-    user_store: Entity<UserStore>,
-    client: Arc<Client>,
-    has_configured_providers: bool,
-    continue_with_zed_ai: Arc<dyn Fn(&mut Window, &mut App)>,
+    dismiss: Arc<dyn Fn(&mut Window, &mut App)>,
 }
 
 impl AgentPanelOnboarding {
-    pub fn new(
-        user_store: Entity<UserStore>,
-        client: Arc<Client>,
-        continue_with_zed_ai: impl Fn(&mut Window, &mut App) + 'static,
-        cx: &mut Context<Self>,
-    ) -> Self {
+    pub fn new(dismiss: impl Fn(&mut Window, &mut App) + 'static, cx: &mut Context<Self>) -> Self {
         cx.subscribe(
             &LanguageModelRegistry::global(cx),
-            |this: &mut Self, _registry, event: &language_model::Event, cx| match event {
+            |_this: &mut Self, _registry, event: &language_model::Event, cx| match event {
                 language_model::Event::ProviderStateChanged(_)
                 | language_model::Event::AddedProvider(_)
                 | language_model::Event::RemovedProvider(_)
-                | language_model::Event::ProvidersChanged => {
-                    this.has_configured_providers = Self::has_configured_providers(cx)
-                }
+                | language_model::Event::ProvidersChanged => cx.notify(),
                 _ => {}
             },
         )
         .detach();
 
         Self {
-            user_store,
-            client,
-            has_configured_providers: Self::has_configured_providers(cx),
-            continue_with_zed_ai: Arc::new(continue_with_zed_ai),
+            dismiss: Arc::new(dismiss),
         }
     }
 
-    fn has_configured_providers(cx: &App) -> bool {
+    pub fn has_configured_providers(cx: &App) -> bool {
         LanguageModelRegistry::read_global(cx)
             .visible_providers()
             .iter()
-            .any(|provider| provider.is_authenticated(cx) && provider.id() != ZED_CLOUD_PROVIDER_ID)
+            .any(|provider| provider.is_authenticated(cx))
     }
 }
 
 impl Render for AgentPanelOnboarding {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let enrolled_in_trial = self
-            .user_store
-            .read(cx)
-            .plan()
-            .is_some_and(|plan| plan == Plan::ZedProTrial);
+    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+        let dismiss = self.dismiss.clone();
 
-        let is_pro_user = self
-            .user_store
-            .read(cx)
-            .plan()
-            .is_some_and(|plan| plan == Plan::ZedPro);
-
-        let onboarding = ZedAiOnboarding::new(
-            self.client.clone(),
-            &self.user_store,
-            self.continue_with_zed_ai.clone(),
-            cx,
+        AgentPanelOnboardingCard::new().child(
+            v_flex()
+                .relative()
+                .min_w_0()
+                .gap_1()
+                .child(Headline::new("Welcome to the Agent Panel"))
+                .child(
+                    Label::new("Connect a language model provider to start your first thread.")
+                        .color(Color::Muted),
+                )
+                .child(ApiKeysWithoutProviders::new())
+                .child(
+                    h_flex().absolute().top_0().right_0().child(
+                        IconButton::new("dismiss_onboarding", IconName::Close)
+                            .icon_size(IconSize::Small)
+                            .tooltip(Tooltip::text("Dismiss"))
+                            .on_click(move |_, window, cx| dismiss(window, cx)),
+                    ),
+                ),
         )
-        .with_dismiss({
-            let callback = self.continue_with_zed_ai.clone();
-            move |window, cx| callback(window, cx)
-        });
-
-        AgentPanelOnboardingCard::new()
-            .child(onboarding)
-            .map(|this| {
-                if enrolled_in_trial || is_pro_user || self.has_configured_providers {
-                    this
-                } else {
-                    this.child(ApiKeysWithoutProviders::new())
-                }
-            })
     }
 }

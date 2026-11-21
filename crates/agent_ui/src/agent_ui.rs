@@ -347,10 +347,8 @@ actions!(
         RejectOnce,
         /// Follows the agent's suggestions.
         Follow,
-        /// Resets the trial upsell notification.
+        /// Shows the agent panel onboarding card again after it was dismissed.
         ResetTrialUpsell,
-        /// Resets the trial end upsell notification.
-        ResetTrialEndUpsell,
         /// Re-enables the fast mode warning for every provider and model.
         ResetFastModeWarnings,
         /// Opens the "Add Context" menu in the message editor.
@@ -914,7 +912,7 @@ fn update_command_palette_filter(cx: &mut App) {
             }
 
             match edit_prediction_provider {
-                EditPredictionProvider::None => {
+                EditPredictionProvider::None | EditPredictionProvider::Zed => {
                     filter.hide_namespace("edit_prediction");
                     filter.hide_namespace("copilot");
                     filter.hide_action_types(&edit_prediction_actions);
@@ -924,8 +922,7 @@ fn update_command_palette_filter(cx: &mut App) {
                     filter.show_namespace("copilot");
                     filter.show_action_types(edit_prediction_actions.iter());
                 }
-                EditPredictionProvider::Zed
-                | EditPredictionProvider::Codestral
+                EditPredictionProvider::Codestral
                 | EditPredictionProvider::Ollama
                 | EditPredictionProvider::OpenAiCompatibleApi
                 | EditPredictionProvider::Mercury => {

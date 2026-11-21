@@ -1,5 +1,5 @@
 use gpui::{Action, IntoElement, ParentElement, RenderOnce};
-use language_model::{IconOrSvg, LanguageModelRegistry, ZED_CLOUD_PROVIDER_ID};
+use language_model::{IconOrSvg, LanguageModelRegistry};
 use ui::{Divider, List, ListBulletItem, prelude::*};
 
 pub struct ApiKeysWithProviders {
@@ -31,9 +31,7 @@ impl ApiKeysWithProviders {
         LanguageModelRegistry::read_global(cx)
             .visible_providers()
             .iter()
-            .filter(|provider| {
-                provider.is_authenticated(cx) && provider.id() != ZED_CLOUD_PROVIDER_ID
-            })
+            .filter(|provider| provider.is_authenticated(cx))
             .map(|provider| (provider.icon(), provider.name().0))
             .collect()
     }
@@ -132,7 +130,7 @@ impl RenderOnce for ApiKeysWithoutProviders {
                     .child(Divider::horizontal()),
             )
             .child(List::new().child(ListBulletItem::new(
-                "Add your own keys to use AI without signing in.",
+                "Add an API key for Anthropic, OpenAI, Ollama or another provider.",
             )))
             .child(
                 Button::new("configure-providers", "Configure Providers")
