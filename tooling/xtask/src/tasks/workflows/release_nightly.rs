@@ -1,5 +1,4 @@
 use crate::tasks::workflows::{
-    nix_build::build_nix,
     release::{
         ReleaseBundleJobs, create_sentry_release, download_workflow_artifacts, notify_on_failure,
         prep_release_artifacts, publish_snap,
@@ -43,8 +42,6 @@ pub fn release_nightly() -> Workflow {
         windows_x86_64: bundle_windows(Arch::X86_64, NIGHTLY, &[&tests]),
     };
 
-    let nix_linux_x86 = build_nix(Platform::Linux, Arch::X86_64, "default", None, &[&tests]);
-    let nix_mac_arm = build_nix(Platform::Mac, Arch::AARCH64, "default", None, &[&tests]);
     let update_nightly_tag = update_nightly_tag_job(&bundle);
     fn download_nightly_tarball(arch: Arch) -> steps::DownloadArtifactStep {
         steps::download_artifact()
@@ -91,8 +88,6 @@ pub fn release_nightly() -> Workflow {
             }
             workflow
         })
-        .add_job(nix_linux_x86.name, nix_linux_x86.job)
-        .add_job(nix_mac_arm.name, nix_mac_arm.job)
         .add_job(update_nightly_tag.name, update_nightly_tag.job)
         .map(|workflow| {
             publish_snap.into_iter().fold(workflow, |workflow, job| {

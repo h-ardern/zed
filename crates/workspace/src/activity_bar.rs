@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
 use gpui::{
-    Action, Context, Entity, IntoElement, ParentElement, Render, Subscription, WeakEntity, Window,
-    px,
+    Action, Context, Entity, IntoElement, ParentElement, Render, Subscription, TaskExt as _,
+    WeakEntity, Window, px,
 };
 use ui::{IconButton, IconSize, Tooltip, prelude::*};
 
 use crate::dock::{Dock, PanelHandle};
-use crate::{CloseActiveItem, DeploySearch, Workspace};
+use crate::{CloseActiveItem, DeploySearch, SaveIntent, Workspace};
 
 /// Left-dock panels, in the order VS Code shows them on the activity bar.
 const PANEL_ORDER: &[&str] = &["ProjectPanel", "GitPanel", "DebugPanel", "OutlinePanel"];
@@ -107,6 +107,7 @@ impl Render for ActivityBar {
                     let tooltip_action = action.boxed_clone();
                     let click_action = action.boxed_clone();
                     let focus_handle = focus_handle.clone();
+                    let workspace = self.workspace.clone();
                     buttons.push(
                         IconButton::new("activity-search", ui::IconName::MagnifyingGlass)
                             .icon_size(IconSize::Medium)
@@ -118,8 +119,29 @@ impl Render for ActivityBar {
                             })
                             .on_click({
                                 move |_, window, cx| {
-                                    window.focus(&focus_handle, cx);
-                                    window.dispatch_action(click_action.boxed_clone(), cx);
+                                    // Dispatching `CloseActiveItem` from the dock's focus never
+                                    // reaches the pane, so close the search tab directly.
+                                    if search_active {
+                                        workspace
+                                            .update(cx, |workspace, cx| {
+                                                let pane = workspace.active_pane().clone();
+                                                pane.update(cx, |pane, cx| {
+                                                    if let Some(item) = pane.active_item() {
+                                                        pane.close_item_by_id(
+                                                            item.item_id(),
+                                                            SaveIntent::Close,
+                                                            window,
+                                                            cx,
+                                                        )
+                                                        .detach_and_log_err(cx);
+                                                    }
+                                                });
+                                            })
+                                            .ok();
+                                    } else {
+                                        window.focus(&focus_handle, cx);
+                                        window.dispatch_action(click_action.boxed_clone(), cx);
+                                    }
                                 }
                             })
                             .into_any_element(),

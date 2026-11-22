@@ -215,6 +215,20 @@
     },
   },
   {
+    "context": "ClaudeDiffView",
+    "bindings": {
+      "alt-y": "claude_code::AcceptDiff",
+      "ctrl-alt-y": "claude_code::AcceptDiff",
+      "ctrl-alt-z": "claude_code::RejectDiff",
+    },
+  },
+  {
+    "context": "Editor && mode == full",
+    "bindings": {
+      "ctrl-alt-k": "claude_code::SendSelection",
+    },
+  },
+  {
     "context": "AgentPanel",
     "bindings": {
       "ctrl-n": "agent::NewThread",

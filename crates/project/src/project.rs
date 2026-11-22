@@ -1472,6 +1472,7 @@ impl Project {
                 git_diff_debouncer: DebouncedDelay::new(),
                 terminals: Terminals {
                     local_handles: Vec::new(),
+                    extra_env: HashMap::default(),
                 },
                 node: Some(node),
                 search_history: Self::new_search_history(),
@@ -1715,6 +1716,7 @@ impl Project {
                 git_diff_debouncer: DebouncedDelay::new(),
                 terminals: Terminals {
                     local_handles: Vec::new(),
+                    extra_env: HashMap::default(),
                 },
                 node: Some(node),
                 search_history: Self::new_search_history(),
@@ -2009,6 +2011,7 @@ impl Project {
                 git_diff_debouncer: DebouncedDelay::new(),
                 terminals: Terminals {
                     local_handles: Vec::new(),
+                    extra_env: HashMap::default(),
                 },
                 node: None,
                 search_history: Self::new_search_history(),

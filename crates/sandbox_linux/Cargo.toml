@@ -14,8 +14,8 @@ doctest = false
 
 # The end-to-end harness is an example, not a test target: CI runs the suite
 # with `cargo nextest run --workspace`, which skips targets whose
-# required-features are unset. The NixOS VM tests build it explicitly
-# (nix/tests/sandboxing/helper.nix).
+# required-features are unset. Build it by hand with
+# `--features __end_to_end_harness`.
 [features]
 __end_to_end_harness = []
 

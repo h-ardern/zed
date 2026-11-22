@@ -454,7 +454,7 @@ Select devices in the Settings Editor, which stores their device IDs in these fi
 Use `null` for the system default.
 Unavailable devices fall back to the system default.
 The dots are part of the literal property names, not nested objects.
-See [Audio Settings](../collaboration/overview.md#audio-settings) for more information.
+See Audio Settings for more information.
 
 ## Autosave
 
@@ -7186,28 +7186,6 @@ Both types also accept:
 - `default_mode`: Mode that new threads start in, for agents that support modes.
 - `default_config_options`: Default values for the agent's session options, keyed by option ID.
 - `favorite_config_option_values`: Favorited values for the agent's session options, keyed by option ID.
-
-## Collaboration Panel
-
-- Description: Customizations for the collaboration panel.
-- Setting: `collaboration_panel`
-- Default:
-
-```json [settings]
-{
-  "collaboration_panel": {
-    "button": true,
-    "dock": "right",
-    "default_width": 240
-  }
-}
-```
-
-**Options**
-
-- `button`: Whether to show the collaboration panel button in the status bar
-- `dock`: Where to dock the collaboration panel. Can be `left` or `right`
-- `default_width`: Default width of the collaboration panel
 
 ## Debuggers {#debuggers}
 

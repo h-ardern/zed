@@ -6,7 +6,7 @@ description: Understand opt-in AI feedback ratings, Edit Prediction training dat
 # Feedback and Training Data
 
 Normal AI requests are not retained by Zed. For
-[Zed-hosted models](../account/zed-hosted-models.md), provider agreements
+Zed-hosted models, provider agreements
 prohibit training on your prompts or code context and require zero data
 retention, except for
 [provider-designated models with safety retention](./privacy-and-security.md#provider-safety-retention),
@@ -142,8 +142,8 @@ resulting model available at
 On Zed Business, data sharing is off by default and controlled by organization
 administrators. Administrators can prevent members from submitting agent thread
 feedback or opting into Edit Prediction training data collection. See
-[Privacy for Business](../business/privacy.md) and
-[Admin Controls](../business/admin-controls.md#data-sharing).
+Privacy for Business and
+Admin Controls.
 
 ## Applicable Terms {#applicable-terms}
 

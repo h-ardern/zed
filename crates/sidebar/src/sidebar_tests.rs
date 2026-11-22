@@ -3277,7 +3277,7 @@ async fn test_closing_last_agent_panel_terminal_restores_empty_header(cx: &mut T
     // placeholder row, so the header reports having threads.
     assert_eq!(
         visible_entries_as_strings(&sidebar, cx),
-        vec!["v [my-project]", "  New Zed Agent Thread"]
+        vec!["v [my-project]", "  New Ded Agent Thread"]
     );
     assert_project_header_has_threads(&sidebar, "my-project", true, cx);
 
@@ -7319,9 +7319,13 @@ async fn test_focused_thread_tracks_user_intent(cx: &mut TestAppContext) {
             workspace.panel::<AgentPanel>(cx).is_some(),
             "Agent panel should exist"
         );
-        let dock = workspace.left_dock().read(cx);
+        let dock = workspace
+            .all_docks()
+            .into_iter()
+            .find(|dock| dock.read(cx).panel::<AgentPanel>().is_some())
+            .expect("the agent panel should be in a dock");
         assert!(
-            dock.is_open(),
+            dock.read(cx).is_open(),
             "Clicking a thread should open the agent panel dock"
         );
     });

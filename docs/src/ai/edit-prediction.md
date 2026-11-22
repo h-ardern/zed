@@ -16,7 +16,7 @@ For privacy and training data details, see
 
 ## Configuring Zeta
 
-To use Zeta, [sign in](../authentication.md#what-features-require-signing-in).
+To use Zeta, sign in.
 Once signed in, predictions appear as you type.
 
 You can confirm that Zeta is properly configured by opening the [Settings Editor](zed://settings/edit_predictions.providers) (`Cmd+,` on macOS or `Ctrl+,` on Linux/Windows) and searching for `edit_predictions`. The `provider` field should be set to `Zed AI`.
@@ -35,7 +35,7 @@ The Z icon in the status bar also indicates Zeta is active.
 
 ### Pricing and Plans
 
-Zeta predictions are included with [Zed Pro](../account/plans-and-pricing.md#pro), the [Pro trial](../account/plans-and-pricing.md#trials), and the [Student](../account/plans-and-pricing.md#student) and [Business](../account/plans-and-pricing.md#business) plans. On the Free plan, you can use [other providers](#other-providers), like GitHub Copilot or a [local model](#local-and-self-hosted-models). See [Zed's pricing page](https://zed.dev/pricing) for details.
+Zeta predictions are included with Zed Pro, the Pro trial, and the Student and Business plans. On the Free plan, you can use [other providers](#other-providers), like GitHub Copilot or a [local model](#local-and-self-hosted-models). See [Zed's pricing page](https://zed.dev/pricing) for details.
 
 ### Switching Modes {#switching-modes}
 

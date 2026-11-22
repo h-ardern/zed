@@ -198,6 +198,9 @@ pub struct SettingsContent {
 
     pub call_hierarchy: Option<CallHierarchySettingsContent>,
 
+    /// Settings for the Claude Code IDE integration, which lets the `claude` CLI connect to this editor.
+    pub claude_code: Option<ClaudeCodeSettingsContent>,
+
     pub git_panel: Option<GitPanelSettingsContent>,
     pub git_graph: Option<GitGraphSettingsContent>,
 
@@ -225,9 +228,6 @@ pub struct SettingsContent {
     ///
     /// Default: Zed
     pub base_keymap: Option<BaseKeymapContent>,
-
-    /// Configuration for the collab panel visual settings.
-    pub collaboration_panel: Option<PanelSettingsContent>,
 
     pub debugger: Option<DebuggerSettingsContent>,
 
@@ -403,8 +403,8 @@ impl SettingsContent {
 fallible_options::flattened_deserialize!(SettingsContent {
     sections: { project, theme, extension, workspace, editor, remote },
     options: {
-        call_hierarchy, command_palette, file_finder, git_panel, git_graph, tabs, tab_bar, tab_switcher, status_bar, preview_tabs, agent,
-        agent_servers, audio, auto_update, base_keymap, collaboration_panel, debugger, diagnostics,
+        call_hierarchy, claude_code, command_palette, file_finder, git_panel, git_graph, tabs, tab_bar, tab_switcher, status_bar, preview_tabs, agent,
+        agent_servers, audio, auto_update, base_keymap, debugger, diagnostics,
         git,
         global_lsp_settings, image_viewer, markdown_preview, repl, helix_mode, hide_mouse,
         journal, log, line_indicator_format, language_models, copilot, outline_panel, project_panel,
@@ -600,6 +600,16 @@ impl From<Option<String>> for AudioOutputDeviceName {
     fn from(value: Option<String>) -> Self {
         Self(value)
     }
+}
+
+/// Settings for the Claude Code IDE integration.
+#[with_fallible_options]
+#[derive(Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema, Debug, MergeFrom)]
+pub struct ClaudeCodeSettingsContent {
+    /// Whether each window runs a local server that the `claude` CLI can connect to with `/ide`.
+    ///
+    /// Default: true
+    pub enabled: Option<bool>,
 }
 
 /// Control what info is collected by Zed.
@@ -943,23 +953,6 @@ pub enum StatusStyle {
 )]
 pub struct ScrollbarSettings {
     pub show: Option<ShowScrollbar>,
-}
-
-#[with_fallible_options]
-#[derive(Clone, Default, Serialize, Deserialize, JsonSchema, MergeFrom, Debug, PartialEq)]
-pub struct PanelSettingsContent {
-    /// Whether to show the panel button in the status bar.
-    ///
-    /// Default: true
-    pub button: Option<bool>,
-    /// Where to dock the panel.
-    ///
-    /// Default: right (Agentic layout), left (Classic layout)
-    pub dock: Option<DockPosition>,
-    /// Default width of the panel in pixels.
-    ///
-    /// Default: 240
-    pub default_width: Option<PixelSetting>,
 }
 
 #[with_fallible_options]

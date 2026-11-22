@@ -6,6 +6,9 @@ on:
       - build-windows
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 concurrency:
   group: build-windows
   cancel-in-progress: true

@@ -27,9 +27,15 @@ use crate::{Project, ProjectPath};
 
 pub struct Terminals {
     pub(crate) local_handles: Vec<WeakEntity<terminal::Terminal>>,
+    /// Variables added to every terminal this project opens, after the user's `terminal.env`.
+    pub(crate) extra_env: HashMap<String, String>,
 }
 
 impl Project {
+    pub fn set_extra_terminal_env(&mut self, env: HashMap<String, String>) {
+        self.terminals.extra_env = env;
+    }
+
     pub fn active_entry_directory(&self, cx: &App) -> Option<PathBuf> {
         let entry_id = self.active_entry()?;
         let worktree = self.worktree_for_entry(entry_id, cx)?;
@@ -91,6 +97,7 @@ impl Project {
             });
         }
         let settings = TerminalSettings::get(settings_location, cx).clone();
+        let extra_env = self.terminals.extra_env.clone();
         let detect_venv = settings.detect_venv.as_option().is_some();
 
         let terminal_mode = TerminalMode::task(spawn_task.clone());
@@ -135,6 +142,7 @@ impl Project {
         cx.spawn(async move |project, cx| {
             let mut env = env_task.await.unwrap_or_default();
             env.extend(settings.env);
+            env.extend(extra_env);
 
             let activation_script = maybe!(async {
                 for toolchain in toolchains {
@@ -329,6 +337,7 @@ impl Project {
             });
         }
         let settings = TerminalSettings::get(settings_location, cx).clone();
+        let extra_env = self.terminals.extra_env.clone();
         let detect_venv = settings.detect_venv.as_option().is_some();
         let local_path = if is_via_remote { None } else { path.clone() };
 
@@ -404,6 +413,7 @@ impl Project {
             let shell_kind = ShellKind::new(&shell_program, path_style.is_windows());
             let mut env = env_task.await.unwrap_or_default();
             env.extend(settings.env);
+            env.extend(extra_env);
 
             let activation_script = maybe!(async {
                 for toolchain in toolchains {

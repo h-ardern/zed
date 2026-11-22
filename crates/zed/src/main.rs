@@ -778,6 +778,7 @@ fn main() {
         language_tools::init(cx);
         notifications::init(app_state.client.clone(), app_state.user_store.clone(), cx);
         title_bar::init(cx);
+        claude_code_ide::init(cx);
         git_ui::init(cx);
         feedback::init(cx);
         markdown_preview::init(cx);

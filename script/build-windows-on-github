@@ -45,8 +45,17 @@ if [[ -z "$run_id" ]]; then
     exit 1
 fi
 
+run_url="$(gh run view --repo "$repository" "$run_id" --json url --jq .url)"
+echo "Live logs: $run_url"
 echo "Watching run $run_id (this can take a couple of hours)..."
-gh run watch --repo "$repository" "$run_id" --exit-status --interval 60
+if ! gh run watch --repo "$repository" "$run_id" --exit-status --interval 60; then
+    echo >&2
+    echo "The Windows build failed. Last 200 lines of the failing step:" >&2
+    gh run view --repo "$repository" "$run_id" --log-failed | tail -n 200 >&2 || true
+    echo >&2
+    echo "Full logs: $run_url" >&2
+    exit 1
+fi
 
 rm -rf "$output_dir"
 gh run download --repo "$repository" "$run_id" --dir "$output_dir"

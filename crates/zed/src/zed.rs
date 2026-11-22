@@ -1373,9 +1373,6 @@ fn register_actions(
             }
         });
 
-    #[cfg(not(target_os = "windows"))]
-    workspace.register_action(install_cli);
-
     if workspace.project().read(cx).is_via_remote_server() {
         workspace.register_action({
             move |workspace, _: &OpenServerSettings, window, cx| {
@@ -1735,16 +1732,6 @@ fn open_about_window(cx: &mut App) {
         },
     )
     .log_err();
-}
-
-#[cfg(not(target_os = "windows"))]
-fn install_cli(
-    _: &mut Workspace,
-    _: &install_cli::InstallCliBinary,
-    window: &mut Window,
-    cx: &mut Context<Workspace>,
-) {
-    install_cli::install_cli_binary(window, cx)
 }
 
 static WAITING_QUIT_CONFIRMATION: AtomicBool = AtomicBool::new(false);
@@ -6286,6 +6273,7 @@ mod tests {
                 "branches",
                 "buffer_search",
                 "call_hierarchy",
+                "claude_code",
                 "cli",
                 "collab",
                 "command_palette",

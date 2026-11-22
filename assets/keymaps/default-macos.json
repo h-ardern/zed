@@ -239,6 +239,22 @@
     },
   },
   {
+    "context": "ClaudeDiffView",
+    "use_key_equivalents": true,
+    "bindings": {
+      "cmd-y": "claude_code::AcceptDiff",
+      "cmd-alt-y": "claude_code::AcceptDiff",
+      "cmd-alt-z": "claude_code::RejectDiff",
+    },
+  },
+  {
+    "context": "Editor && mode == full",
+    "use_key_equivalents": true,
+    "bindings": {
+      "cmd-alt-k": "claude_code::SendSelection",
+    },
+  },
+  {
     "context": "Editor && editor_agent_diff",
     "use_key_equivalents": true,
     "bindings": {

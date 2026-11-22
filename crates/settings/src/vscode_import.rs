@@ -186,7 +186,6 @@ impl VsCodeSettings {
             audio: None,
             auto_update: None,
             base_keymap: Some(BaseKeymapContent::VSCode),
-            collaboration_panel: None,
             command_palette: self
                 .read_u64("workbench.commandPalette.history")
                 .map(|history| CommandPaletteSettingsContent {
@@ -199,6 +198,7 @@ impl VsCodeSettings {
             editor: self.editor_settings_content(),
             extension: ExtensionSettingsContent::default(),
             call_hierarchy: None,
+            claude_code: None,
             file_finder: None,
             git: self.git_settings_content(),
             git_panel: self.git_panel_settings_content(),

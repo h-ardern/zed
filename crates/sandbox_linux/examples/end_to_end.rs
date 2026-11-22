@@ -15,8 +15,8 @@
 //! Declared as an example gated behind `__end_to_end_harness`, not a test
 //! target: CI's `cargo nextest run --workspace` never builds or runs it. The
 //! sandbox re-executes this binary as its own supervisor and helper, so it
-//! needs its own `main()`; the NixOS VM tests build it with Crane and run it
-//! as `sandbox-linux-test-helper` (nix/tests/sandboxing/default.nix).
+//! needs its own `main()`. Run it by hand with
+//! `cargo run -p sandbox_linux --example end_to_end --features __end_to_end_harness`.
 //!
 //! The actions need Python 3, `unshare` and the usual coreutils on PATH,
 //! checked before running. Echo peers run in-process on the host, so no

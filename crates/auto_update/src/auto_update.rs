@@ -266,8 +266,6 @@ impl Global for GlobalAutoUpdate {}
 
 pub fn init(client: Arc<Client>, cx: &mut App) {
     cx.observe_new(|workspace: &mut Workspace, _window, _cx| {
-        workspace.register_action(|_, action, window, cx| check(action, window, cx));
-
         workspace.register_action(|_, action, _, cx| {
             view_release_notes(action, cx);
         });
