@@ -1,22 +1,58 @@
 #!/usr/bin/env bash
 
-set -euxo pipefail
+set -euo pipefail
 
 if [[ $# -gt 0 ]]; then
   echo "
   Usage: ${0##*/}
-  Builds and installs zed onto your system into ~/.local, making it available as ~/.local/bin/zed.
+  Builds and installs Ded into ~/.local, making it available as ~/.local/bin/ded.
 
-  Before running this you should ensure you have all the build dependencies installed with `./script/linux`.
+  Before running this you should ensure you have all the build dependencies installed with \`./script/linux\`.
   "
   exit 1
 fi
-export ZED_CHANNEL=$(<crates/zed/RELEASE_CHANNEL)
-export ZED_UPDATE_EXPLANATION="You need to fetch and rebuild zed in $(pwd)"
-script/bundle-linux
+
+channel=$(<crates/zed/RELEASE_CHANNEL)
+export ZED_CHANNEL="$channel"
+export ZED_UPDATE_EXPLANATION="You need to fetch and rebuild Ded in $(pwd)"
+script/bundle-linux --skip-sentry
 
 arch="$(uname -m)"
-commit=$(git rev-parse HEAD | cut -c 1-7)
-archive="zed-linux-${arch}.tar.gz"
-export ZED_BUNDLE_PATH="${CARGO_TARGET_DIR:-target}/release/${archive}"
-script/install.sh
+archive="${CARGO_TARGET_DIR:-target}/release/ded-linux-${arch}.tar.gz"
+
+suffix=""
+if [[ "$channel" != "stable" ]]; then
+  suffix="-$channel"
+fi
+
+case "$channel" in
+  stable) appid="dev.ded.Ded" ;;
+  nightly) appid="dev.ded.Ded-Nightly" ;;
+  preview) appid="dev.ded.Ded-Preview" ;;
+  *) appid="dev.ded.Ded-Dev" ;;
+esac
+
+app_dir="$HOME/.local/ded$suffix.app"
+rm -rf "$app_dir"
+mkdir -p "$HOME/.local/bin" "$HOME/.local/share/applications"
+tar -xzf "$archive" -C "$HOME/.local/"
+
+ln -sf "$app_dir/bin/ded" "$HOME/.local/bin/ded"
+
+desktop_file="$HOME/.local/share/applications/${appid}.desktop"
+cp "$app_dir/share/applications/${appid}.desktop" "$desktop_file"
+sed -i "s|Icon=ded|Icon=$app_dir/share/icons/hicolor/512x512/apps/ded.png|g" "$desktop_file"
+sed -i "s|Exec=ded|Exec=$app_dir/bin/ded|g" "$desktop_file"
+
+# Remove the install this fork made before it was renamed from Zed. Only the
+# dev-channel copy is touched, so an official Zed install is left alone.
+old_app="$HOME/.local/zed$suffix.app"
+if [[ "$channel" == "dev" && -d "$old_app" ]]; then
+  rm -rf "$old_app"
+  rm -f "$HOME/.local/share/applications/dev.zed.Zed-Dev.desktop"
+  if [[ -L "$HOME/.local/bin/zed" && "$(readlink "$HOME/.local/bin/zed")" == "$old_app/"* ]]; then
+    rm -f "$HOME/.local/bin/zed"
+  fi
+fi
+
+echo "Ded installed. Run it with 'ded'."

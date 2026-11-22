@@ -30,6 +30,6 @@ jobs:
       - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
-          name: Zed-windows-x86_64
-          path: target/Zed-x86_64.exe
+          name: Ded-windows-x86_64
+          path: target/Ded-x86_64.exe
           if-no-files-found: error
