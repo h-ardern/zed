@@ -4,34 +4,64 @@
 # with fxc.exe only when the build host is Windows. So we push HEAD to a
 # dedicated branch that triggers .github/workflows/build-windows.yml on a
 # GitHub-hosted Windows runner, then download the resulting installer.
+#
+# With --tag <tag>, nothing is pushed: we wait for the run that pushing that
+# release tag already started (see script/release) and download its installer.
 
 set -euo pipefail
 
 workflow_name="Build Windows"
 trigger_branch="build-windows"
 output_dir="dist/windows"
+tag=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --tag)
+            tag="${2:?--tag needs a tag name}"
+            shift 2
+            ;;
+        --output)
+            output_dir="${2:?--output needs a directory}"
+            shift 2
+            ;;
+        *)
+            echo "Usage: $0 [--tag <tag>] [--output <dir>]" >&2
+            exit 1
+            ;;
+    esac
+done
 
 if ! command -v gh >/dev/null 2>&1; then
     echo "The GitHub CLI (gh) is required: https://cli.github.com" >&2
     exit 1
 fi
 
-if [[ -n "$(git status --porcelain)" ]]; then
-    echo "You have uncommitted changes. Commit them first: the Windows build uses what is pushed." >&2
-    exit 1
-fi
-
 # gh would otherwise default to the upstream zed-industries/zed repository.
 repository="$(git remote get-url origin | sed -E 's#^(https://github\.com/|git@github\.com:)##; s#\.git$##')"
-commit="$(git rev-parse HEAD)"
-echo "Pushing ${commit:0:7} to origin/${trigger_branch}..."
-git push --force origin "HEAD:refs/heads/${trigger_branch}"
+
+if [[ -n "$tag" ]]; then
+    commit="$(git rev-parse "${tag}^{commit}")"
+    run_branch="$tag"
+    echo "Looking for the Windows build of ${tag} (${commit:0:7})..."
+else
+    if [[ -n "$(git status --porcelain)" ]]; then
+        echo "You have uncommitted changes. Commit them first: the Windows build uses what is pushed." >&2
+        exit 1
+    fi
+
+    commit="$(git rev-parse HEAD)"
+    run_branch="$trigger_branch"
+    echo "Pushing ${commit:0:7} to origin/${trigger_branch}..."
+    git push --force origin "HEAD:refs/heads/${trigger_branch}"
+fi
 
 echo "Waiting for the GitHub Actions run to start..."
 run_id=""
 for _ in $(seq 1 60); do
     # Filter by name rather than --workflow, which only resolves workflows on the default branch.
-    run_id="$(gh run list --repo "$repository" --branch "$trigger_branch" --limit 20 \
+    # For tag pushes, gh reports the tag name as the run's branch.
+    run_id="$(gh run list --repo "$repository" --branch "$run_branch" --limit 20 \
         --json databaseId,headSha,workflowName \
         --jq "map(select(.headSha == \"$commit\" and .workflowName == \"$workflow_name\")) | first | .databaseId // empty")"
     if [[ -n "$run_id" ]]; then

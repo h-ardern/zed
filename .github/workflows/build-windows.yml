@@ -4,13 +4,17 @@ on:
   push:
     branches:
       - build-windows
+    # Release tags pushed by script/release.
+    tags:
+      - v*
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: build-windows
+  # Per ref, so a `make windows` run can't cancel a release build.
+  group: build-windows-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -25,6 +29,17 @@ jobs:
 
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
+
+      - name: Use the stable channel for release tags
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: Set-Content -Path crates/zed/RELEASE_CHANNEL -Value stable -NoNewline
+        shell: pwsh
+
+      - name: Set release version
+        run: |
+          $version = & script/get-crate-version.ps1 zed
+          "RELEASE_VERSION=$version" >> $env:GITHUB_ENV
+        shell: pwsh
 
       - name: Bundle Windows installer
         run: script/bundle-windows.ps1 -Architecture x86_64

@@ -1,0 +1,184 @@
+#!/usr/bin/env bash
+
+# Cut a Ded release and publish it on GitHub.
+#
+#   script/release [--version X.Y.Z | --bump patch|minor|major]
+#   script/release --resume vX.Y.Z
+#
+# A release bumps the version in crates/zed/Cargo.toml, commits and tags it on
+# main, and pushes both. Pushing the tag starts the Windows build on GitHub
+# Actions (.github/workflows/build-windows.yml) while the Linux tarball builds
+# here. Once both exist they are published as a GitHub release.
+#
+# Releases are built on the stable channel; RELEASE_CHANNEL stays `dev` in the
+# repository so local `make install` builds remain "Ded Dev".
+#
+# --resume redoes the build and publish steps for a tag that is already pushed,
+# e.g. after the terminal was closed or a build failed.
+
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+version=""
+bump="patch"
+resume_tag=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --version)
+            version="${2:?--version needs X.Y.Z}"
+            shift 2
+            ;;
+        --bump)
+            bump="${2:?--bump needs patch, minor or major}"
+            shift 2
+            ;;
+        --resume)
+            resume_tag="${2:?--resume needs a tag such as v0.1.0}"
+            shift 2
+            ;;
+        *)
+            echo "Usage: $0 [--version X.Y.Z | --bump patch|minor|major] | --resume vX.Y.Z" >&2
+            exit 1
+            ;;
+    esac
+done
+
+fail() {
+    echo "error: $*" >&2
+    exit 1
+}
+
+if ! command -v gh >/dev/null 2>&1; then
+    fail "the GitHub CLI (gh) is required: https://cli.github.com"
+fi
+gh auth status >/dev/null 2>&1 || fail "gh is not logged in; run 'gh auth login'"
+
+repository="$(git remote get-url origin | sed -E 's#^(https://github\.com/|git@github\.com:)##; s#\.git$##')"
+cargo_toml="crates/zed/Cargo.toml"
+channel_file="crates/zed/RELEASE_CHANNEL"
+
+current_version="$(sed -n 's/^version = "\(.*\)"$/\1/p' "$cargo_toml" | head -n 1)"
+[[ -n "$current_version" ]] || fail "could not read the version from $cargo_toml"
+
+next_version() {
+    local major minor patch
+    IFS=. read -r major minor patch <<<"$current_version"
+    case "$bump" in
+        patch) echo "$major.$minor.$((patch + 1))" ;;
+        minor) echo "$major.$((minor + 1)).0" ;;
+        major) echo "$((major + 1)).0.0" ;;
+        *) fail "--bump must be patch, minor or major, not '$bump'" ;;
+    esac
+}
+
+cut_release() {
+    local branch
+    branch="$(git rev-parse --abbrev-ref HEAD)"
+    [[ "$branch" == "main" ]] || fail "releases are cut from main, but you are on '$branch'"
+    [[ -z "$(git status --porcelain)" ]] || fail "you have uncommitted changes; commit or stash them first"
+
+    echo "Fetching origin..."
+    git fetch --quiet --tags origin
+    [[ "$(git rev-parse HEAD)" == "$(git rev-parse origin/main)" ]] ||
+        fail "main is not level with origin/main; pull or push first"
+
+    if [[ -z "$version" ]]; then
+        version="$(next_version)"
+    fi
+    [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "'$version' is not a version like 0.1.0"
+    tag="v$version"
+
+    if git rev-parse -q --verify "refs/tags/$tag" >/dev/null ||
+        [[ -n "$(git ls-remote --tags origin "refs/tags/$tag")" ]]; then
+        fail "tag $tag already exists; use '$0 --resume $tag' to finish publishing it"
+    fi
+
+    echo
+    echo "  Repository: $repository"
+    echo "  Version:    $current_version -> $version"
+    echo "  Tag:        $tag on $(git rev-parse --short HEAD) + a 'Release $tag' commit"
+    echo
+    echo "This pushes main and $tag to origin and publishes the release on GitHub."
+    read -r -p "Continue? [y/N] " answer
+    [[ "$answer" =~ ^[Yy]$ ]] || {
+        echo "Aborted; nothing was changed."
+        exit 0
+    }
+
+    sed -i "0,/^version = \".*\"$/s//version = \"$version\"/" "$cargo_toml"
+    cargo update -p zed --offline
+    git add "$cargo_toml" Cargo.lock
+    git commit -m "Release $tag"
+    git tag -a "$tag" -m "Ded $tag"
+
+    git push origin main
+    git push origin "$tag"
+    echo "Pushed $tag; the Windows build is now running on GitHub Actions."
+}
+
+build_linux() {
+    local release_dir="$1"
+    local arch
+    arch="$(uname -m)"
+
+    # The channel is baked in at compile time, so swap it to stable for this
+    # build only and always put the committed value back.
+    trap 'git checkout -- "$channel_file"' EXIT
+    echo "stable" >"$channel_file"
+
+    echo "Building the Linux release tarball (stable channel)..."
+    ./script/bundle-linux --skip-sentry
+
+    git checkout -- "$channel_file"
+    trap - EXIT
+
+    cp "target/release/ded-linux-${arch}.tar.gz" "$release_dir/ded-${tag}-linux-${arch}.tar.gz"
+}
+
+fetch_windows() {
+    local release_dir="$1"
+    local windows_dir="$release_dir/windows"
+    local installer
+
+    ./script/build-windows-on-github --tag "$tag" --output "$windows_dir"
+
+    installer="$(find "$windows_dir" -type f -name '*.exe' | head -n 1)"
+    [[ -n "$installer" ]] || fail "the Windows build produced no installer"
+    mv "$installer" "$release_dir/Ded-${tag}-windows-x86_64.exe"
+    rm -rf "$windows_dir"
+}
+
+publish() {
+    local release_dir="$1"
+    local assets=("$release_dir"/ded-"$tag"-linux-*.tar.gz "$release_dir/Ded-${tag}-windows-x86_64.exe")
+
+    if gh release view "$tag" --repo "$repository" >/dev/null 2>&1; then
+        echo "Release $tag already exists; replacing its files..."
+        gh release upload "$tag" "${assets[@]}" --repo "$repository" --clobber
+    else
+        gh release create "$tag" "${assets[@]}" --repo "$repository" \
+            --title "Ded $tag" --generate-notes --verify-tag
+    fi
+
+    echo
+    echo "Released: $(gh release view "$tag" --repo "$repository" --json url --jq .url)"
+}
+
+if [[ -n "$resume_tag" ]]; then
+    tag="$resume_tag"
+    git rev-parse -q --verify "refs/tags/$tag" >/dev/null || git fetch --quiet --tags origin
+    git rev-parse -q --verify "refs/tags/$tag" >/dev/null || fail "tag $tag does not exist"
+    [[ "$(git rev-parse HEAD)" == "$(git rev-parse "${tag}^{commit}")" ]] ||
+        fail "check out $tag first ('git checkout $tag'): the Linux build uses the working tree"
+else
+    cut_release
+fi
+
+release_dir="dist/release/$tag"
+mkdir -p "$release_dir"
+
+build_linux "$release_dir"
+fetch_windows "$release_dir"
+publish "$release_dir"

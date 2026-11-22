@@ -273,7 +273,8 @@ function BuildInstaller {
     $issFilePath = "$innoDir\zed.iss"
     switch ($channel) {
         "stable" {
-            $appId = "{{6F85A485-FE2C-418A-B0EA-2513B744305D}"
+            # Ded's own IDs, so installing Ded never replaces or collides with a Zed install.
+            $appId = "{{B84DA0D5-3C6B-4039-AD91-3B0B4694CE7E}"
             $appIconName = "app-icon"
             $appName = "Ded"
             $appDisplayName = "Ded"
@@ -281,9 +282,9 @@ function BuildInstaller {
             # The mutex name here should match the mutex name in crates\zed\src\zed\windows_only_instance.rs
             $appMutex = "Ded-Editor-Stable-Instance-Mutex"
             $appExeName = "Zed"
-            $regValueName = "Zed"
-            $appUserId = "ZedIndustries.Zed"
-            $appShellNameShort = "Z&ed"
+            $regValueName = "Ded"
+            $appUserId = "Ded.Ded"
+            $appShellNameShort = "D&ed"
             $appAppxFullName = "ZedIndustries.Zed_1.0.0.0_neutral__japxn1gcva8rg"
         }
         "preview" {

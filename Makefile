@@ -1,8 +1,8 @@
 .DEFAULT_GOAL := help
-.PHONY: help deps linux install run test windows
+.PHONY: help deps linux install run test windows release release-resume
 
 help: ## List available targets
-	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "} {printf "  make %-10s %s\n", $$1, $$2}'
+	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "} {printf "  make %-15s %s\n", $$1, $$2}'
 
 deps: ## Install Linux build dependencies (uses sudo)
 	./script/linux
@@ -22,3 +22,9 @@ test: ## Run tests with a 60s per-test timeout (CRATES="a b" to limit)
 
 windows: ## Build the Windows installer on GitHub Actions and download it to dist/windows
 	./script/build-windows-on-github
+
+release: ## Publish a GitHub release (VERSION=X.Y.Z, or BUMP=patch|minor|major; default patch)
+	./script/release $(if $(VERSION),--version $(VERSION),--bump $(or $(BUMP),patch))
+
+release-resume: ## Finish building and publishing an already-pushed release (TAG=vX.Y.Z)
+	./script/release --resume $(TAG)
