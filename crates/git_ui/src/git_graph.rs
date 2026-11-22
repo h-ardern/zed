@@ -1479,7 +1479,7 @@ pub struct GitGraph {
     selected_commit_message: Option<DetailPanelCommitMessage>,
     _selected_commit_message_task: Option<Task<()>>,
     commit_details_split_state: Entity<SplitState>,
-    repo_id: RepositoryId,
+    pub(crate) repo_id: RepositoryId,
     changed_files_scroll_handle: UniformListScrollHandle,
     changed_files_view_mode: ChangedFilesViewMode,
     commit_details_metadata_collapsed: bool,
@@ -1487,6 +1487,9 @@ pub struct GitGraph {
     changed_files_expanded_dirs: HashMap<RepoPath, bool>,
     pending_select_sha: Option<Oid>,
     nav_history: Option<ItemNavHistory>,
+    /// Set when the graph is embedded in the git panel, where there is no room
+    /// for the search bar, column headers, extra columns or the details split.
+    compact: bool,
 }
 
 impl GitGraph {
@@ -1759,9 +1762,40 @@ impl GitGraph {
             changed_files_expanded_dirs: HashMap::default(),
             pending_select_sha: None,
             nav_history: None,
+            compact: false,
         };
 
         this.fetch_initial_graph_data(cx);
+        this
+    }
+
+    pub fn new_compact(
+        repo_id: RepositoryId,
+        git_store: Entity<GitStore>,
+        workspace: WeakEntity<Workspace>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Self {
+        let mut this = Self::new(
+            repo_id,
+            git_store,
+            workspace,
+            Some(LogSource::All),
+            window,
+            cx,
+        );
+        this.compact = true;
+        let hidden_columns = [
+            REFS_COLUMN_INDEX,
+            GRAPH_LAYOUT_TABLE_OFFSET + 1,
+            GRAPH_LAYOUT_TABLE_OFFSET + 2,
+            GRAPH_LAYOUT_TABLE_OFFSET + 3,
+        ];
+        for column in hidden_columns {
+            if let Some(hidden) = this.column_visibility.as_mut_slice().get_mut(column) {
+                *hidden = true;
+            }
+        }
         this
     }
 
@@ -3626,6 +3660,7 @@ impl GitGraph {
         let is_focused = self.focus_handle.is_focused(window);
         let graph_canvas_bounds = self.graph_canvas_bounds.clone();
         let paint_ref_connectors = self.is_refs_column_visible();
+        let compact = self.compact;
 
         gpui::canvas(
             move |_bounds, _window, _cx| {},
@@ -3635,7 +3670,11 @@ impl GitGraph {
                 window.paint_layer(|window| {
                     let theme = cx.theme();
                     let accent_colors = theme.accents();
-                    let background = theme.colors().editor_background;
+                    let background = if compact {
+                        theme.colors().panel_background
+                    } else {
+                        theme.colors().editor_background
+                    };
 
                     let hover_bg = theme.colors().element_hover.opacity(0.6);
                     let selected_bg = if is_focused {
@@ -4398,7 +4437,11 @@ impl Render for GitGraph {
             };
             let label = Label::new(message)
                 .color(Color::Muted)
-                .size(LabelSize::Large);
+                .size(if self.compact {
+                    LabelSize::Small
+                } else {
+                    LabelSize::Large
+                });
 
             h_flex()
                 .size_full()
@@ -4447,6 +4490,11 @@ impl Render for GitGraph {
 
             let table_collapsed = table_fraction <= f32::EPSILON;
             let graph_content_width = self.graph_canvas_content_width();
+            let compact = self.compact;
+            // In the narrow git panel, size the graph to its lanes so a linear
+            // history leaves the description most of the width.
+            let compact_graph_width =
+                LANE_WIDTH * self.graph_data.max_lanes.max(1) as f32 + LEFT_PADDING * 2.0;
 
             h_flex()
                 .size_full()
@@ -4457,7 +4505,8 @@ impl Render for GitGraph {
                         .size_full()
                         .flex()
                         .flex_col()
-                        .child(
+                        .when(!self.compact, |this| {
+                            this.child(
                             div()
                                 .on_mouse_down(
                                     MouseButton::Right,
@@ -4518,6 +4567,7 @@ impl Render for GitGraph {
                                     cx,
                                 )),
                         )
+                        })
                         .child({
                             let row_height = Self::row_height(window, cx);
                             let selected_entry_idx = self.selected_entry_idx;
@@ -4654,7 +4704,13 @@ impl Render for GitGraph {
                                                         cx,
                                                     )
                                                     .map(|this| {
-                                                        if table_collapsed {
+                                                        if compact {
+                                                            this.flex_none()
+                                                                .w(compact_graph_width)
+                                                                .max_w(DefiniteLength::Fraction(
+                                                                    0.5,
+                                                                ))
+                                                        } else if table_collapsed {
                                                             this.w(graph_content_width)
                                                         } else {
                                                             this.w(DefiniteLength::Fraction(
@@ -4675,7 +4731,7 @@ impl Render for GitGraph {
                                                     .tab_group()
                                                     .tab_stop(false)
                                                     .map(|this| {
-                                                        if table_collapsed {
+                                                        if table_collapsed || compact {
                                                             this.flex_1()
                                                         } else {
                                                             this.w(DefiniteLength::Fraction(
@@ -4688,12 +4744,14 @@ impl Render for GitGraph {
                                                     .child(commits_table),
                                             ),
                                     )
-                                    .child(render_redistributable_columns_resize_handles(
-                                        &self.column_widths,
-                                        Some(&self.column_visibility),
-                                        window,
-                                        cx,
-                                    )),
+                                    .when(!compact, |this| {
+                                        this.child(render_redistributable_columns_resize_handles(
+                                            &self.column_widths,
+                                            Some(&self.column_visibility),
+                                            window,
+                                            cx,
+                                        ))
+                                    }),
                                 self.column_widths.clone(),
                                 Some(self.column_visibility.clone()),
                             )
@@ -4707,7 +4765,7 @@ impl Render for GitGraph {
                 // Registering a drop target ends the drag here; the ratio was
                 // already applied while dragging.
                 .on_drop::<DraggedSplitHandle>(|_, _, _| {})
-                .when(self.selected_entry_idx.is_some(), |this| {
+                .when(self.selected_entry_idx.is_some() && !compact, |this| {
                     this.child(self.render_commit_view_resize_handle(window, cx))
                         .child(self.render_commit_detail_panel(window, cx))
                 })
@@ -4717,7 +4775,11 @@ impl Render for GitGraph {
             .key_context("GitGraph")
             .track_focus(&self.focus_handle)
             .size_full()
-            .bg(cx.theme().colors().editor_background)
+            .bg(if self.compact {
+                cx.theme().colors().panel_background
+            } else {
+                cx.theme().colors().editor_background
+            })
             .on_action(cx.listener(|this, _: &OpenCommitView, window, cx| {
                 this.open_selected_commit_view(window, cx);
             }))
@@ -4755,7 +4817,7 @@ impl Render for GitGraph {
             .child(
                 v_flex()
                     .size_full()
-                    .child(self.render_search_bar(cx))
+                    .when(!self.compact, |this| this.child(self.render_search_bar(cx)))
                     .child(div().flex_1().child(content)),
             )
             .children(self.context_menu.as_ref().map(|context_menu| {
@@ -6100,6 +6162,62 @@ mod tests {
 
         assert_eq!(commit_count, 0);
         assert!(!is_loading, "empty graph data should stop loading");
+    }
+
+    #[gpui::test]
+    async fn test_compact_graph_shows_only_graph_and_description(cx: &mut TestAppContext) {
+        init_test(cx);
+
+        let fs = FakeFs::new(cx.executor());
+        fs.insert_tree(
+            Path::new("/project"),
+            json!({
+                ".git": {},
+                "file.txt": "content",
+            }),
+        )
+        .await;
+
+        let project = Project::test(fs.clone(), [Path::new("/project")], cx).await;
+        project
+            .update(cx, |project, cx| project.git_scans_complete(cx))
+            .await;
+        cx.run_until_parked();
+
+        let repository = project.read_with(cx, |project, cx| {
+            project
+                .active_repository(cx)
+                .expect("should have an active repository")
+        });
+
+        let (multi_workspace, cx) = cx.add_window_view(|window, cx| {
+            workspace::MultiWorkspace::test_new(project.clone(), window, cx)
+        });
+        let workspace = multi_workspace.read_with(&*cx, |multi, _| multi.workspace().downgrade());
+        let git_graph = cx.new_window_entity(|window, cx| {
+            GitGraph::new_compact(
+                repository.read(cx).id,
+                project.read(cx).git_store().clone(),
+                workspace,
+                window,
+                cx,
+            )
+        });
+        cx.run_until_parked();
+
+        git_graph.read_with(&*cx, |graph, _| {
+            assert!(graph.compact);
+            assert_eq!(graph.log_source, LogSource::All);
+            assert!(!graph.is_refs_column_visible());
+            assert!(graph.is_graph_column_visible());
+            assert!(graph.is_column_visible(GRAPH_LAYOUT_TABLE_OFFSET));
+            for column in 1..TABLE_COLUMN_COUNT {
+                assert!(
+                    !graph.is_column_visible(GRAPH_LAYOUT_TABLE_OFFSET + column),
+                    "column {column} should be hidden in the compact graph"
+                );
+            }
+        });
     }
 
     #[gpui::test]

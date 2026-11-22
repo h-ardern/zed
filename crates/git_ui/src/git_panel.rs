@@ -11,6 +11,7 @@ use crate::commit_context_menu::{
 use crate::commit_modal::CommitModal;
 use crate::commit_tooltip::{CommitAvatar, CommitTooltip};
 use crate::commit_view::CommitView;
+use crate::git_graph::GitGraph;
 use crate::git_panel_settings::GitPanelScrollbarAccessor;
 use crate::project_diff::{Diff, ProjectDiff};
 use crate::remote_output::{self, RemoteAction, SuccessMessage};
@@ -53,10 +54,10 @@ use git::{
 };
 use gpui::{
     AbsoluteLength, Action, Anchor, AnyElement, AsyncApp, AsyncWindowContext, ClickEvent,
-    ClipboardItem, DismissEvent, Empty, Entity, EventEmitter, FocusHandle, Focusable, KeyContext,
-    MouseButton, MouseDownEvent, Pixels, Point, PromptLevel, ScrollStrategy, Subscription, Task,
-    TaskExt, TextStyle, UniformListScrollHandle, WeakEntity, actions, anchored, deferred,
-    uniform_list,
+    ClipboardItem, DismissEvent, DragMoveEvent, Empty, Entity, EventEmitter, FocusHandle,
+    Focusable, KeyContext, MouseButton, MouseDownEvent, Pixels, Point, PromptLevel, ScrollStrategy,
+    Subscription, Task, TaskExt, TextStyle, UniformListScrollHandle, WeakEntity, actions, anchored,
+    deferred, uniform_list,
 };
 use itertools::Itertools;
 use language::{Buffer, BufferEvent, File};
@@ -310,6 +311,18 @@ impl Render for StashMessageModal {
             )
             .child(div().px_3().pb_3().w_full().child(self.editor.clone()))
     }
+}
+
+struct DraggedGraphSectionHandle;
+
+const GRAPH_SECTION_MIN_HEIGHT: Pixels = px(80.);
+const CHANGES_MIN_HEIGHT: Pixels = px(120.);
+
+/// Clamps a dragged graph section height so neither the graph nor the changes
+/// list above it can be squeezed out of the panel.
+fn clamp_graph_section_height(height: Pixels, available_height: Pixels) -> Pixels {
+    let max_height = (available_height - CHANGES_MIN_HEIGHT).max(GRAPH_SECTION_MIN_HEIGHT);
+    height.clamp(GRAPH_SECTION_MIN_HEIGHT, max_height)
 }
 
 struct DraggedGitEntryView {
@@ -1361,6 +1374,10 @@ pub struct GitPanel {
     history_keyboard_nav: bool,
     _commit_message_buffer_subscription: Option<Subscription>,
     _repo_subscriptions: Vec<Subscription>,
+    commit_graph: Option<Entity<GitGraph>>,
+    graph_section_expanded: bool,
+    /// `None` splits the height evenly with the changes list until the user drags.
+    graph_section_height: Option<Pixels>,
     _settings_subscription: Subscription,
     git_access: Option<GitAccess>,
     commit_menu_handle: PopoverMenuHandle<ContextMenu>,
@@ -1768,6 +1785,9 @@ impl GitPanel {
                 history_keyboard_nav: false,
                 _commit_message_buffer_subscription: None,
                 _repo_subscriptions: Vec::new(),
+                commit_graph: None,
+                graph_section_expanded: true,
+                graph_section_height: None,
                 _settings_subscription,
                 git_access: None,
                 commit_menu_handle: PopoverMenuHandle::default(),
@@ -5793,6 +5813,7 @@ impl GitPanel {
             self.update_active_history_sha(cx);
             self.reset_branch_state(window, cx);
         }
+        self.sync_commit_graph(window, cx);
         self.reopen_commit_buffer(window, cx);
         self.preload_commit_history(cx);
         if self.active_tab == GitPanelTab::History {
@@ -7594,6 +7615,119 @@ impl GitPanel {
             )
     }
 
+    fn sync_commit_graph(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let repository_id = self
+            .active_repository
+            .as_ref()
+            .map(|repository| repository.read(cx).id);
+        let Some(repository_id) = repository_id else {
+            self.commit_graph = None;
+            return;
+        };
+
+        if let Some(commit_graph) = &self.commit_graph {
+            commit_graph.update(cx, |graph, cx| graph.set_repo_id(repository_id, cx));
+        } else {
+            let git_store = self.project.read(cx).git_store().clone();
+            let workspace = self.workspace.clone();
+            self.commit_graph =
+                Some(cx.new(|cx| {
+                    GitGraph::new_compact(repository_id, git_store, workspace, window, cx)
+                }));
+        }
+    }
+
+    fn render_graph_section(&self, cx: &mut Context<Self>) -> Option<impl IntoElement> {
+        let commit_graph = self.commit_graph.clone()?;
+        let expanded = self.graph_section_expanded;
+
+        Some(
+            v_flex()
+                .when(expanded, |this| match self.graph_section_height {
+                    Some(height) => this.flex_none().h(height),
+                    None => this.flex_1().min_h(rems(8.)),
+                })
+                .relative()
+                .w_full()
+                .overflow_hidden()
+                .border_t_1()
+                .border_color(cx.theme().colors().border)
+                .child(
+                    h_flex()
+                        .id("graph-section-header")
+                        .flex_none()
+                        .w_full()
+                        .h(Tab::container_height(cx))
+                        .px_2()
+                        .gap_1()
+                        .justify_between()
+                        .cursor_pointer()
+                        .hover(|style| style.bg(cx.theme().colors().element_hover))
+                        .on_click(cx.listener(|this, _, _window, cx| {
+                            this.graph_section_expanded = !this.graph_section_expanded;
+                            cx.notify();
+                        }))
+                        .child(
+                            h_flex()
+                                .gap_1()
+                                .child(
+                                    Icon::new(if expanded {
+                                        IconName::ChevronDown
+                                    } else {
+                                        IconName::ChevronRight
+                                    })
+                                    .size(IconSize::Small)
+                                    .color(Color::Muted),
+                                )
+                                .child(Label::new("Graph").size(LabelSize::Small)),
+                        )
+                        .child(
+                            IconButton::new("open-git-graph-tab", IconName::GitGraph)
+                                .icon_size(IconSize::Small)
+                                .tooltip(|_window, cx| {
+                                    Tooltip::for_action(
+                                        "Open Git Graph",
+                                        &crate::git_graph::Open,
+                                        cx,
+                                    )
+                                })
+                                .on_click(|_, window, cx| {
+                                    cx.stop_propagation();
+                                    window.dispatch_action(crate::git_graph::Open.boxed_clone(), cx)
+                                }),
+                        ),
+                )
+                .when(expanded, |this| {
+                    this.child(
+                        div()
+                            .flex_1()
+                            .min_h_0()
+                            .overflow_hidden()
+                            .child(commit_graph),
+                    )
+                    .child(
+                        div()
+                            .id("graph-section-resize-handle")
+                            .absolute()
+                            .top_0()
+                            .left_0()
+                            .w_full()
+                            .h(px(6.))
+                            .cursor_row_resize()
+                            .block_mouse_except_scroll()
+                            .on_click(cx.listener(|this, event: &ClickEvent, _window, cx| {
+                                if event.click_count() >= 2 {
+                                    this.graph_section_height = None;
+                                    cx.notify();
+                                }
+                                cx.stop_propagation();
+                            }))
+                            .on_drag(DraggedGraphSectionHandle, |_, _, _, cx| cx.new(|_| Empty)),
+                    )
+                }),
+        )
+    }
+
     fn render_previous_commit(
         &self,
         _window: &mut Window,
@@ -7653,48 +7787,26 @@ impl GitPanel {
                             }
                         }),
                 )
-                .child(
-                    h_flex()
-                        .gap_0p5()
-                        .when(commit.has_parent, |this| {
-                            let has_unstaged = self.has_unstaged_changes();
-                            this.child(
-                                IconButton::new("undo", IconName::Undo)
-                                    .icon_size(IconSize::Small)
-                                    .tooltip(move |_window, cx| {
-                                        Tooltip::with_meta(
-                                            "Uncommit",
-                                            Some(&git::Uncommit),
-                                            if has_unstaged {
-                                                "git reset HEAD^ --soft"
-                                            } else {
-                                                "git reset HEAD^"
-                                            },
-                                            cx,
-                                        )
-                                    })
-                                    .on_click(
-                                        cx.listener(|this, _, window, cx| {
-                                            this.uncommit(window, cx)
-                                        }),
-                                    ),
-                            )
-                        })
-                        .child(
-                            IconButton::new("git-graph-button", IconName::GitGraph)
-                                .icon_size(IconSize::Small)
-                                .tooltip(|_window, cx| {
-                                    Tooltip::for_action(
-                                        "Open Git Graph",
-                                        &crate::git_graph::Open,
-                                        cx,
-                                    )
-                                })
-                                .on_click(|_, window, cx| {
-                                    window.dispatch_action(crate::git_graph::Open.boxed_clone(), cx)
-                                }),
-                        ),
-                ),
+                .child(h_flex().gap_0p5().when(commit.has_parent, |this| {
+                    let has_unstaged = self.has_unstaged_changes();
+                    this.child(
+                        IconButton::new("undo", IconName::Undo)
+                            .icon_size(IconSize::Small)
+                            .tooltip(move |_window, cx| {
+                                Tooltip::with_meta(
+                                    "Uncommit",
+                                    Some(&git::Uncommit),
+                                    if has_unstaged {
+                                        "git reset HEAD^ --soft"
+                                    } else {
+                                        "git reset HEAD^"
+                                    },
+                                    cx,
+                                )
+                            })
+                            .on_click(cx.listener(|this, _, window, cx| this.uncommit(window, cx))),
+                    )
+                })),
         )
     }
 
@@ -10011,6 +10123,17 @@ impl Render for GitPanel {
             .child(
                 v_flex()
                     .size_full()
+                    .on_drag_move::<DraggedGraphSectionHandle>(cx.listener(
+                        |this, event: &DragMoveEvent<DraggedGraphSectionHandle>, _window, cx| {
+                            let height = event.bounds.bottom() - event.event.position.y;
+                            this.graph_section_height =
+                                Some(clamp_graph_section_height(height, event.bounds.size.height));
+                            cx.notify();
+                        },
+                    ))
+                    // Registering a drop target ends the drag here; the height was
+                    // already applied while dragging.
+                    .on_drop::<DraggedGraphSectionHandle>(|_, _, _| {})
                     .when(!self.commit_editor_expanded, |this| {
                         this.child(self.render_tab_bar(cx))
                     })
@@ -10039,6 +10162,9 @@ impl Render for GitPanel {
                             })
                             .when(!self.amend_pending, |this| {
                                 this.children(self.render_previous_commit(window, cx))
+                            })
+                            .when(!self.commit_editor_expanded, |this| {
+                                this.children(self.render_graph_section(cx))
                             }),
                         GitPanelTab::History => this.child(self.render_history_tab(window, cx)),
                     })
@@ -10915,6 +11041,46 @@ mod tests {
         await_git_panel_entries(&panel, &mut cx).await;
 
         (fs, project, workspace, panel, cx)
+    }
+
+    #[test]
+    fn test_clamp_graph_section_height() {
+        assert_eq!(clamp_graph_section_height(px(10.), px(600.)), px(80.));
+        assert_eq!(clamp_graph_section_height(px(300.), px(600.)), px(300.));
+        assert_eq!(clamp_graph_section_height(px(590.), px(600.)), px(480.));
+        // A panel too short for both minimums still keeps the graph usable.
+        assert_eq!(clamp_graph_section_height(px(150.), px(150.)), px(80.));
+    }
+
+    #[gpui::test]
+    async fn test_commit_graph_section_follows_active_repository(cx: &mut TestAppContext) {
+        init_test(cx);
+        let (_, project, _, panel, mut cx) = setup_git_panel_with_changes(
+            cx,
+            json!({
+                ".git": {},
+                "file": "modified\n",
+            }),
+            &[("file", StatusCode::Modified)],
+        )
+        .await;
+
+        let repository_id = project.read_with(&cx, |project, cx| {
+            project
+                .active_repository(cx)
+                .expect("should have an active repository")
+                .read(cx)
+                .id
+        });
+
+        panel.update_in(&mut cx, |panel, _window, cx| {
+            let commit_graph = panel
+                .commit_graph
+                .clone()
+                .expect("the git panel should embed a commit graph");
+            assert_eq!(commit_graph.read(cx).repo_id, repository_id);
+            assert!(panel.graph_section_expanded);
+        });
     }
 
     #[gpui::test]
