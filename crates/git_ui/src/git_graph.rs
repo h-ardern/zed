@@ -2089,6 +2089,22 @@ impl GitGraph {
             });
         }
 
+        // The compact graph has no refs column, so its ref chips go in front of the subject.
+        let compact_ref_style = self.compact.then(|| {
+            let head_branch_name: Option<SharedString> = repository.as_ref().and_then(|repo| {
+                repo.read(cx)
+                    .branch
+                    .as_ref()
+                    .map(|branch| SharedString::from(branch.name().to_string()))
+            });
+            let theme = cx.theme();
+            (
+                head_branch_name,
+                theme.accents().clone(),
+                theme.colors().panel_background,
+            )
+        });
+
         range
             .map(|idx| {
                 let Some((commit, repository)) =
@@ -2174,11 +2190,61 @@ impl GitGraph {
                     column_label(subject)
                 };
 
+                let ref_chips = compact_ref_style
+                    .as_ref()
+                    .filter(|_| !commit.data.ref_names.is_empty())
+                    .map(|(head_branch_name, accent_colors, background)| {
+                        const MAX_COMPACT_REF_CHIPS: usize = 2;
+                        let accent_color = accent_colors.color_for_index(commit.color_idx as u32);
+                        let (head_refs, other_refs): (Vec<_>, Vec<_>) =
+                            commit.data.ref_names.iter().cloned().partition(|name| {
+                                Self::is_head_ref(name.as_ref(), head_branch_name)
+                            });
+                        let mut ref_names = head_refs
+                            .into_iter()
+                            .map(|name| (name, true))
+                            .chain(other_refs.into_iter().map(|name| (name, false)));
+                        let mut chips = ref_names
+                            .by_ref()
+                            .take(MAX_COMPACT_REF_CHIPS)
+                            .map(|(name, is_head)| {
+                                self.render_ref_chip(
+                                    name,
+                                    accent_color,
+                                    is_head,
+                                    idx,
+                                    *background,
+                                    cx,
+                                )
+                            })
+                            .collect::<Vec<_>>();
+                        let hidden_refs = ref_names.map(|(name, _)| name).collect::<Vec<_>>();
+                        if !hidden_refs.is_empty() {
+                            chips.push(self.render_ref_count_chip(
+                                hidden_refs,
+                                accent_color,
+                                idx,
+                                cx,
+                            ));
+                        }
+                        h_flex()
+                            .min_w_0()
+                            .max_w(DefiniteLength::Fraction(0.6))
+                            .gap_1()
+                            .children(chips)
+                    });
+
                 vec![
                     div()
                         .id(ElementId::NamedInteger("commit-subject".into(), idx as u64))
                         .overflow_hidden()
-                        .child(h_flex().gap_2().overflow_hidden().child(subject_label))
+                        .child(
+                            h_flex()
+                                .gap_2()
+                                .overflow_hidden()
+                                .children(ref_chips)
+                                .child(subject_label),
+                        )
                         .into_any_element(),
                     column_label(formatted_time.into()),
                     {
